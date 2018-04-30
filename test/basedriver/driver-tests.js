@@ -2,6 +2,8 @@ import _ from 'lodash';
 import chai from 'chai';
 import chaiAsPromised from 'chai-as-promised';
 import B from 'bluebird';
+import { DeviceSettings } from '../..';
+import BaseDriver from "../../lib/basedriver/driver";
 
 const should = chai.should();
 chai.use(chaiAsPromised);
@@ -9,31 +11,41 @@ chai.use(chaiAsPromised);
 // wrap these tests in a function so we can export the tests and re-use them
 // for actual driver implementations
 function baseDriverUnitTests (DriverClass, defaultCaps = {}) {
-  describe('BaseDriver', () => {
+  const w3cCaps = {
+    alwaysMatch: Object.assign({}, defaultCaps, {
+      platformName: 'Fake',
+      deviceName: 'Commodore 64',
+    }),
+    firstMatch: [{}],
+  };
 
+  describe('BaseDriver', function () {
     let d;
-    beforeEach(() => {
+    beforeEach(function () {
       d = new DriverClass();
     });
+    afterEach(async function () {
+      await d.deleteSession();
+    });
 
-    it('should return an empty status object', async () => {
+    it('should return an empty status object', async function () {
       let status = await d.getStatus();
       status.should.eql({});
     });
 
-    it('should return a sessionId from createSession', async () => {
+    it('should return a sessionId from createSession', async function () {
       let [sessId] = await d.createSession(defaultCaps);
       should.exist(sessId);
       sessId.should.be.a('string');
       sessId.length.should.be.above(5);
     });
 
-    it('should not be able to start two sessions without closing the first', async () => {
+    it('should not be able to start two sessions without closing the first', async function () {
       await d.createSession(defaultCaps);
       await d.createSession(defaultCaps).should.eventually.be.rejectedWith('session');
     });
 
-    it('should be able to delete a session', async () => {
+    it('should be able to delete a session', async function () {
       let sessionId1 = await d.createSession(defaultCaps);
       await d.deleteSession();
       should.equal(d.sessionId, null);
@@ -41,17 +53,17 @@ function baseDriverUnitTests (DriverClass, defaultCaps = {}) {
       sessionId1.should.not.eql(sessionId2);
     });
 
-    it('should get the current session', async () => {
+    it('should get the current session', async function () {
       let [, caps] = await d.createSession(defaultCaps);
       caps.should.equal(await d.getSession());
     });
 
-    it('should return sessions if no session exists', async () => {
+    it('should return sessions if no session exists', async function () {
       let sessions = await d.getSessions();
       sessions.length.should.equal(0);
     });
 
-    it('should return sessions', async () => {
+    it('should return sessions', async function () {
       let caps = _.clone(defaultCaps);
       caps.a = 'cap';
       await d.createSession(caps);
@@ -64,7 +76,7 @@ function baseDriverUnitTests (DriverClass, defaultCaps = {}) {
       });
     });
 
-    it('should fulfill an unexpected driver quit promise', async () => {
+    it('should fulfill an unexpected driver quit promise', async function () {
       // make a command that will wait a bit so we can crash while it's running
       d.getStatus = async function () {
         await B.delay(100);
@@ -76,7 +88,7 @@ function baseDriverUnitTests (DriverClass, defaultCaps = {}) {
       await d.onUnexpectedShutdown.should.be.rejectedWith(/We crashed/);
     });
 
-    it('should not allow commands in middle of unexpected shutdown', async () => {
+    it('should not allow commands in middle of unexpected shutdown', async function () {
       // make a command that will wait a bit so we can crash while it's running
       d.oldDeleteSession = d.deleteSession;
       d.deleteSession = async function () {
@@ -90,7 +102,7 @@ function baseDriverUnitTests (DriverClass, defaultCaps = {}) {
       await d.executeCommand('getSession').should.be.rejectedWith(/shut down/);
     });
 
-    it('should allow new commands after done shutting down', async () => {
+    it('should allow new commands after done shutting down', async function () {
       // make a command that will wait a bit so we can crash while it's running
       d.oldDeleteSession = d.deleteSession;
       d.deleteSession = async function () {
@@ -107,12 +119,46 @@ function baseDriverUnitTests (DriverClass, defaultCaps = {}) {
       await d.deleteSession();
     });
 
-    it('should have a method to get driver for a session', async () => {
+    it('should distinguish between W3C and JSONWP session', async function () {
+      // Test JSONWP
+      await d.executeCommand('createSession', Object.assign({}, defaultCaps, {
+        platformName: 'Fake',
+        deviceName: 'Commodore 64',
+      }));
+
+      d.protocol.should.equal('MJSONWP');
+      await d.executeCommand('deleteSession');
+
+      // Test W3C (leave first 2 args null because those are the JSONWP args)
+      await d.executeCommand('createSession', null, null, {
+        alwaysMatch: Object.assign({}, defaultCaps, {
+          platformName: 'Fake',
+          deviceName: 'Commodore 64',
+        }),
+        firstMatch: [{}],
+      });
+
+      d.protocol.should.equal('W3C');
+    });
+
+    describe('protocol detection', function () {
+      it('should use MJSONWP if only JSONWP caps are provided', async function () {
+        await d.createSession(defaultCaps);
+        d.protocol.should.equal('MJSONWP');
+      });
+
+      it('should use W3C if only W3C caps are provided', async function () {
+        await d.createSession(null, null, {alwaysMatch: defaultCaps, firstMatch: [{}]});
+        d.protocol.should.equal('W3C');
+      });
+    });
+
+    it('should have a method to get driver for a session', async function () {
       let [sessId] = await d.createSession(defaultCaps);
       d.driverForSession(sessId).should.eql(d);
     });
 
-    describe('command queue', () => {
+    describe('command queue', function () {
       let d = new DriverClass();
 
       let waitMs = 10;
@@ -126,11 +172,11 @@ function baseDriverUnitTests (DriverClass, defaultCaps = {}) {
         throw new Error('multipass');
       }.bind(d);
 
-      afterEach(() => {
+      afterEach(function () {
         d.clearNewCommandTimeout();
       });
 
-      it('should queue commands and.executeCommand/respond in the order received', async () => {
+      it('should queue commands and.executeCommand/respond in the order received', async function () {
         let numCmds = 10;
         let cmds = [];
         for (let i = 0; i < numCmds; i++) {
@@ -144,7 +190,7 @@ function baseDriverUnitTests (DriverClass, defaultCaps = {}) {
         }
       });
 
-      it('should handle errors correctly when queuing', async () => {
+      it('should handle errors correctly when queuing', async function () {
         let numCmds = 10;
         let cmds = [];
         for (let i = 0; i < numCmds; i++) {
@@ -168,7 +214,7 @@ function baseDriverUnitTests (DriverClass, defaultCaps = {}) {
         }
       });
 
-      it('should not care if queue empties for a bit', async () => {
+      it('should not care if queue empties for a bit', async function () {
         let numCmds = 10;
         let cmds = [];
         for (let i = 0; i < numCmds; i++) {
@@ -188,70 +234,184 @@ function baseDriverUnitTests (DriverClass, defaultCaps = {}) {
       });
     });
 
-    describe('timeouts', () => {
-      before(async () => {
+    describe('timeouts', function () {
+      before(async function () {
         await d.createSession(defaultCaps);
       });
-      describe('command', () => {
-        it('should exist by default', async () => {
+      describe('command', function () {
+        it('should exist by default', async function () {
           d.newCommandTimeoutMs.should.equal(60000);
         });
-        it('should be settable through `timeouts`', async () => {
-          await d.timeouts('command', 20);
+        it('should be settable through `timeouts`', async function () {
+          await d.timeouts({protocol: BaseDriver.DRIVER_PROTOCOL.MJSONWP, type: 'command', ms: 20}, "1dcfe021-8fc8-49bd-8dac-e986d3091b97");
           d.newCommandTimeoutMs.should.equal(20);
         });
       });
-      describe('implicit', () => {
-        it('should not exist by default', async () => {
+      describe('implicit', function () {
+        it('should not exist by default', async function () {
           d.implicitWaitMs.should.equal(0);
         });
-        it('should be settable through `timeouts`', async () => {
-          await d.timeouts('implicit', 20);
+        it('should be settable through `timeouts`', async function () {
+          await d.timeouts({protocol: BaseDriver.DRIVER_PROTOCOL.MJSONWP, type: 'implicit', ms: 20}, "1dcfe021-8fc8-49bd-8dac-e986d3091b97");
           d.implicitWaitMs.should.equal(20);
         });
       });
     });
 
-    describe('proxying', () => {
+    describe('timeouts (W3C)', function () {
+      beforeEach(async function () {
+        await d.createSession(null, null, w3cCaps);
+      });
+      afterEach(async function () {
+        await d.deleteSession();
+      });
+      it('should get timeouts that we set', async function () {
+        await d.timeouts({protocol: BaseDriver.DRIVER_PROTOCOL.W3C, script: undefined, pageLoad: undefined, implicit: 1000}, "1dcfe021-8fc8-49bd-8dac-e986d3091b97");
+        await d.getTimeouts().should.eventually.have.property('implicit', 1000);
+        await d.timeouts({protocol: BaseDriver.DRIVER_PROTOCOL.MJSONWP, type: 'command', ms: 2000}, "1dcfe021-8fc8-49bd-8dac-e986d3091b97");
+        await d.getTimeouts().should.eventually.deep.equal({
+          implicit: 1000,
+          command: 2000,
+        });
+        await d.timeouts({protocol: BaseDriver.DRIVER_PROTOCOL.W3C, script: undefined, pageLoad: undefined, implicit: 3000}, "1dcfe021-8fc8-49bd-8dac-e986d3091b97");
+        await d.getTimeouts().should.eventually.deep.equal({
+          implicit: 3000,
+          command: 2000,
+        });
+      });
+    });
+
+    describe('reset compatibility', function () {
+      it('should not allow both fullReset and noReset to be true', async function () {
+        let newCaps = Object.assign({}, defaultCaps, {
+          fullReset: true,
+          noReset: true
+        });
+        await d.createSession(newCaps).should.eventually.be.rejectedWith(
+            /noReset.+fullReset/);
+      });
+    });
+
+    describe('proxying', function () {
       let sessId;
-      beforeEach(async () => {
+      beforeEach(async function () {
         [sessId] = await d.createSession(defaultCaps);
       });
-      describe('#proxyActive', () => {
-        it('should exist', () => {
+      describe('#proxyActive', function () {
+        it('should exist', function () {
           d.proxyActive.should.be.an.instanceof(Function);
         });
-        it('should return false', () => {
+        it('should return false', function () {
           d.proxyActive(sessId).should.be.false;
         });
-        it('should throw an error when sessionId is wrong', () => {
+        it('should throw an error when sessionId is wrong', function () {
           (() => { d.proxyActive('aaa'); }).should.throw;
         });
       });
 
-      describe('#getProxyAvoidList', () => {
-        it('should exist', () => {
+      describe('#getProxyAvoidList', function () {
+        it('should exist', function () {
           d.getProxyAvoidList.should.be.an.instanceof(Function);
         });
-        it('should return an array', () => {
+        it('should return an array', function () {
           d.getProxyAvoidList(sessId).should.be.an.instanceof(Array);
         });
-        it('should throw an error when sessionId is wrong', () => {
+        it('should throw an error when sessionId is wrong', function () {
           (() => { d.getProxyAvoidList('aaa'); }).should.throw;
         });
       });
 
-      describe('#canProxy', () => {
-        it('should have a #canProxy method', () => {
+      describe('#canProxy', function () {
+        it('should have a #canProxy method', function () {
           d.canProxy.should.be.an.instanceof(Function);
         });
-        it('should return false from #canProxy', () => {
+        it('should return false from #canProxy', function () {
           d.canProxy(sessId).should.be.false;
         });
-        it('should throw an error when sessionId is wrong', () => {
+        it('should throw an error when sessionId is wrong', function () {
           (() => { d.canProxy(); }).should.throw;
         });
       });
+    });
+
+    describe('event timing framework', function () {
+      let beforeStartTime;
+      beforeEach(async function () {
+        beforeStartTime = Date.now();
+        d.shouldValidateCaps = false;
+        await d.executeCommand('createSession', defaultCaps);
+      });
+      describe('#eventHistory', function () {
+        it('should have an eventHistory property', function () {
+          should.exist(d.eventHistory);
+          should.exist(d.eventHistory.commands);
+        });
+
+        it('should have a session start timing after session start', function () {
+          let {newSessionRequested, newSessionStarted} = d.eventHistory;
+          newSessionRequested.should.have.length(1);
+          newSessionStarted.should.have.length(1);
+          newSessionRequested[0].should.be.a('number');
+          newSessionStarted[0].should.be.a('number');
+          (newSessionRequested[0] >= beforeStartTime).should.be.true;
+          (newSessionStarted[0] >= newSessionRequested[0]).should.be.true;
+        });
+
+        it('should include a commands list', async function () {
+          await d.executeCommand('getStatus', []);
+          d.eventHistory.commands.length.should.equal(2);
+          d.eventHistory.commands[1].cmd.should.equal('getStatus');
+          d.eventHistory.commands[1].startTime.should.be.a('number');
+          d.eventHistory.commands[1].endTime.should.be.a('number');
+        });
+      });
+      describe('#logEvent', function () {
+        it('should allow logging arbitrary events', function () {
+          d.logEvent('foo');
+          d.eventHistory.foo[0].should.be.a('number');
+          (d.eventHistory.foo[0] >= beforeStartTime).should.be.true;
+        });
+        it('should not allow reserved or oddly formed event names', function () {
+          (() => {
+            d.logEvent('commands');
+          }).should.throw();
+          (() => {
+            d.logEvent(1);
+          }).should.throw();
+          (() => {
+            d.logEvent({});
+          }).should.throw();
+        });
+      });
+      it('should allow logging the same event multiple times', function () {
+        d.logEvent('bar');
+        d.logEvent('bar');
+        d.eventHistory.bar.should.have.length(2);
+        d.eventHistory.bar[1].should.be.a('number');
+        (d.eventHistory.bar[1] >= d.eventHistory.bar[0]).should.be.true;
+      });
+      describe('getSession decoration', function () {
+        it('should decorate getSession response if opt-in cap is provided', async function () {
+          let res = await d.getSession();
+          should.not.exist(res.events);
+
+          d.caps.eventTimings = true;
+          res = await d.getSession();
+          should.exist(res.events);
+          should.exist(res.events.newSessionRequested);
+          res.events.newSessionRequested[0].should.be.a('number');
+        });
+      });
+    });
+  });
+
+  describe('DeviceSettings', function () {
+    it('should not hold on to reference of defaults in constructor', function () {
+      let obj = {foo: 'bar'};
+      let d1 = new DeviceSettings(obj);
+      let d2 = new DeviceSettings(obj);
+      d1._settings.foo = 'baz';
+      d1._settings.should.not.eql(d2._settings);
     });
   });
 }

@@ -4,7 +4,7 @@ The following are endpoints that are currently supported by the Appium server. P
 
 ### WebDriver endpoints
 
-See the WebDriver [W3C](https://w3c.github.io/webdriver/webdriver-spec.html#list-of-endpoints) and [JSON Wire Protocol](https://code.google.com/p/selenium/wiki/JsonWireProtocol) specifications.
+See the WebDriver [W3C](https://w3c.github.io/webdriver/webdriver-spec.html#list-of-endpoints) and [JSON Wire Protocol](https://github.com/SeleniumHQ/selenium/wiki/JsonWireProtocol) specifications.
 
 HTTP Method | Path                                                                   | Details
 ------------|------------------------------------------------------------------------|---------
@@ -109,6 +109,8 @@ POST        | `/wd/hub/session/{sessionId}/appium/device/shake`                 
 POST        | `/wd/hub/session/{sessionId}/appium/device/lock`                       | Lock the device.
 POST        | `/wd/hub/session/{sessionId}/appium/device/unlock`                     | Unlock the device.
 POST        | `/wd/hub/session/{sessionId}/appium/device/is_locked`                  | Check whether the device is locked or not.
+POST        | `/wd/hub/session/{sessionId}/appium/start_recording_screen`            | start recording the screen.
+POST        | `/wd/hub/session/{sessionId}/appium/stop_recording_screen`             | stop recording the screen.
 POST        | `/wd/hub/session/{sessionId}/appium/performanceData/types`             | returns the information types of the system state which is supported to read as like cpu, memory, network traffic, and battery.
 POST        | `/wd/hub/session/{sessionId}/appium/getPerformanceData`				 | returns the information of the system state which is supported to read as like cpu, memory, network traffic, and battery.
 POST        | `/wd/hub/session/{sessionId}/appium/device/press_keycode`              | Press a particular key code on the device.
@@ -116,6 +118,7 @@ POST        | `/wd/hub/session/{sessionId}/appium/device/long_press_keycode`    
 POST        | `/wd/hub/session/{sessionId}/appium/device/keyevent`                   | Send a key code to the device.
 POST        | `/wd/hub/session/{sessionId}/appium/device/rotate`                     | Rotate the device in three dimensions.
 GET         | `/wd/hub/session/{sessionId}/appium/device/current_activity`           | Retrieve the current activity running on the device.
+GET         | `/wd/hub/session/{sessionId}/appium/device/current_package`            | Retrieve the current package running on the device.
 POST        | `/wd/hub/session/{sessionId}/appium/device/install_app`                | Install the given app onto the device.
 POST        | `/wd/hub/session/{sessionId}/appium/device/remove_app`                 | Remote an app from the device.
 POST        | `/wd/hub/session/{sessionId}/appium/device/app_installed`              | Check whether the specified app is installed on the device.
@@ -132,6 +135,7 @@ POST        | `/wd/hub/session/{sessionId}/appium/device/open_notifications`    
 POST        | `/wd/hub/session/{sessionId}/appium/device/start_activity`             | Start the specified activity on the device.
 GET         | `/wd/hub/session/{sessionId}/appium/device/system_bars`                | Retrieve visibility and bounds information of the status and navigation bars.
 GET         | `/wd/hub/session/{sessionId}/appium/device/display_density`            | Retrieve the display density of the device.
+POST        | `/wd/hub/session/{sessionId}/appium/simulator/toggle_touch_id_enrollment` | Toggle enrollment of touch id on the simulator.
 POST        | `/wd/hub/session/{sessionId}/appium/simulator/touch_id`                | Simulate a successful or failed touch id event on the simulator.
 POST        | `/wd/hub/session/{sessionId}/appium/app/launch`                        | Launch the given application on the device.
 POST        | `/wd/hub/session/{sessionId}/appium/app/close`                         | Close the given application.

@@ -1,16 +1,19 @@
-import { errors, MobileJsonWireProtocol } from '../..';
+import { errors, BaseDriver } from '../..';
 import _ from 'lodash';
 
-class FakeDriver extends MobileJsonWireProtocol {
+class FakeDriver extends BaseDriver {
 
   constructor () {
     super();
+    this.protocol = BaseDriver.DRIVER_PROTOCOL.MJSONWP;
     this.sessionId = null;
     this.jwpProxyActive = false;
   }
 
   sessionExists (sessionId) {
-    if (!sessionId) return false;
+    if (!sessionId) {
+      return false;
+    }
     return sessionId === this.sessionId;
   }
 
@@ -18,16 +21,23 @@ class FakeDriver extends MobileJsonWireProtocol {
     return this;
   }
 
-  async createSession (desiredCapabilities, requiredCapabilities={}) {
+  async createSession (desiredCapabilities, requiredCapabilities, capabilities) {
     this.sessionId = "1234";
-    this.desiredCapabilities = desiredCapabilities;
-    this.requiredCapabilities = requiredCapabilities;
-    return [this.sessionId, _.extend({}, desiredCapabilities, requiredCapabilities)];
+    if (capabilities) {
+      return [this.sessionId, capabilities];
+    } else {
+      this.desiredCapabilities = desiredCapabilities;
+      this.requiredCapabilities = requiredCapabilities || {};
+      return [this.sessionId, _.extend({}, desiredCapabilities, requiredCapabilities)];
+    }
   }
 
   async executeCommand (cmd, ...args) {
     if (!this[cmd]) {
       throw new errors.NotYetImplementedError();
+    }
+    if (cmd === 'createSession') {
+      this.protocol = BaseDriver.determineProtocol.apply(null, args);
     }
     return await this[cmd](...args);
   }
@@ -91,8 +101,8 @@ class FakeDriver extends MobileJsonWireProtocol {
     return [attr, elementId, sessionId];
   }
 
-  async setValue (elementId, value) {
-    return value;
+  async setValue (value, elementId) {
+    return [value, elementId];
   }
 
   async performTouch (...args) {
