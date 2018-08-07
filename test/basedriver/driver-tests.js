@@ -5,6 +5,7 @@ import B from 'bluebird';
 import { DeviceSettings } from '../..';
 import BaseDriver from "../../lib/basedriver/driver";
 
+
 const should = chai.should();
 chai.use(chaiAsPromised);
 
@@ -401,6 +402,35 @@ function baseDriverUnitTests (DriverClass, defaultCaps = {}) {
           should.exist(res.events.newSessionRequested);
           res.events.newSessionRequested[0].should.be.a('number');
         });
+      });
+    });
+    describe('.reset', function () {
+      it('should reset as W3C if the original session was W3C', async function () {
+        const caps = {
+          alwaysMatch: Object.assign({}, defaultCaps, {
+            app: 'Fake',
+            deviceName: 'Fake',
+            automationName: 'Fake',
+            platformName: 'Fake',
+          }),
+          firstMatch: [{}],
+        };
+        await d.createSession(undefined, undefined, caps);
+        d.protocol.should.equal('W3C');
+        await d.reset();
+        d.protocol.should.equal('W3C');
+      });
+      it('should reset as MJSONWP if the original session was MJSONWP', async function () {
+        const caps = Object.assign({}, defaultCaps, {
+          app: 'Fake',
+          deviceName: 'Fake',
+          automationName: 'Fake',
+          platformName: 'Fake',
+        });
+        await d.createSession(caps);
+        d.protocol.should.equal('MJSONWP');
+        await d.reset();
+        d.protocol.should.equal('MJSONWP');
       });
     });
   });
